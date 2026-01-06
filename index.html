@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Réservation rapide — DIGIYLYFE</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Même style que inscription-client.html -->
+  <style>
+    /* ... ton style existant ... */
+  </style>
+</head>
+<body>
+<div class="box">
+  <div class="logo" id="moduleLogo">⚡</div>
+  <h1 id="moduleTitle">Réservation rapide</h1>
+  <div class="sub" id="moduleSubtitle">
+    Sans créer de compte, juste votre numéro
+  </div>
+
+  <form id="quickBookForm">
+    <div class="form-group">
+      <label>📱 Votre numéro de téléphone *</label>
+      <input type="tel" id="guestPhone" required placeholder="+221 77 123 45 67" />
+    </div>
+
+    <div class="form-group" id="nameField" style="display:none;">
+      <label>👤 Votre nom (pour la réservation) *</label>
+      <input type="text" id="guestName" placeholder="Astou Diop" />
+    </div>
+    
+    <button type="submit" class="btn" id="btnContinue">⚡ Continuer</button>
+  </form>
+
+  <div id="msg" class="msg"></div>
+
+  <div class="footer">
+    Vous avez un compte ? <a href="connexion-client.html">Se connecter</a><br>
+    <a href="digiy-hub/" style="color:#94a3b8;">← Retour</a>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const sb = window.supabase.createClient(
+  "https://wesqmwjjtsefyjnluosj.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indlc3Ftd2pqdHNlZnlqbmx1b3NqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUxNzg4ODIsImV4cCI6MjA4MDc1NDg4Mn0.dZfYOc2iL2_wRYL3zExZFsFSBK6AbMeOid2LrIjcTdA"
+);
+
+// Configuration des modules
+const MODULES = {
+  driver: {
+    logo: '🚗',
+    title: 'Commander sans compte',
+    subtitle: 'Réservez votre VTC rapidement',
+    needName: true,
+    nextPage: 'digiy-driver-order.html'
+  },
+  resa: {
+    logo: '🍽️',
+    title: 'Réserver sans compte',
+    subtitle: 'Réservez votre table au restaurant',
+    needName: true,
+    nextPage: 'digiy-resa-booking.html'
+  },
+  loc: {
+    logo: '🏠',
+    title: 'Louer sans compte',
+    subtitle: 'Réservez votre logement',
+    needName: true,
+    nextPage: 'digiy-loc-booking.html'
+  },
+  ndimbal: {
+    logo: '📦',
+    title: 'Livraison express',
+    subtitle: 'Commandez votre livraison',
+    needName: true,
+    nextPage: 'digiy-ndimbal-order.html'
+  }
+};
+
+// Détection du module
+const urlParams = new URLSearchParams(window.location.search);
+const module = urlParams.get('module') || 'driver';
+const config = MODULES[module] || MODULES.driver;
+
+// Personnalisation de la page
+document.getElementById('moduleLogo').textContent = config.logo;
+document.getElementById('moduleTitle').textContent = config.title;
+document.getElementById('moduleSubtitle').textContent = config.subtitle;
+
+if (config.needName) {
+  document.getElementById('nameField').style.display = 'block';
+  document.getElementById('guestName').required = true;
+}
+
+// Soumission du formulaire
+document.getElementById('quickBookForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  
+  const phone = document.getElementById('guestPhone').value.trim();
+  const name = document.getElementById('guestName')?.value.trim() || '';
+  
+  if (!phone) {
+    showMsg('⚠️ Veuillez entrer votre numéro');
+    return;
+  }
+  
+  if (config.needName && !name) {
+    showMsg('⚠️ Veuillez entrer votre nom');
+    return;
+  }
+  
+  const btnContinue = document.getElementById('btnContinue');
+  btnContinue.disabled = true;
+  btnContinue.textContent = '⏳ Vérification...';
+  
+  try {
+    // Sauvegarde temporaire dans Supabase
+    const { data, error } = await sb
+      .from('guest_bookings')
+      .insert({
+        phone: phone,
+        name: name,
+        module: module,
+        status: 'initiated',
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    // Sauvegarde aussi en localStorage (backup)
+    localStorage.setItem('guestSession', JSON.stringify({
+      bookingId: data.id,
+      phone: phone,
+      name: name,
+      module: module
+    }));
+    
+    // Redirection vers la page de réservation du module
+    window.location.href = `${config.nextPage}?guest=true&bookingId=${data.id}`;
+    
+  } catch (err) {
+    console.error('Erreur:', err);
+    showMsg('❌ ' + (err.message || 'Erreur de connexion'));
+    btnContinue.disabled = false;
+    btnContinue.textContent = '⚡ Continuer';
+  }
+});
+
+function showMsg(text, type = 'error') {
+  const msg = document.getElementById('msg');
+  msg.textContent = text;
+  msg.className = 'msg ' + type;
+}
+</script>
+</body>
+</html>
